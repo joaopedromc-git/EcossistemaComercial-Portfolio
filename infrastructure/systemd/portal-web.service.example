@@ -1,0 +1,27 @@
+[Unit]
+Description=Portfolio - Portal Web
+After=network.target
+
+[Service]
+Type=simple
+
+WorkingDirectory=/opt/ecossistema-portfolio/apps/portal-web
+
+ExecStart=/usr/bin/dotnet /opt/ecossistema-portfolio/apps/portal-web/PortalVendas.dll
+
+Restart=always
+RestartSec=5
+
+User=www-data
+Group=www-data
+
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5001
+
+EnvironmentFile=-/etc/ecossistema-portfolio/portal-web.env
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

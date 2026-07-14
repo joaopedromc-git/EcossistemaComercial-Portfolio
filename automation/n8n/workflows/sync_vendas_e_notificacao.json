@@ -1,0 +1,617 @@
+{
+  "name": "sync_vendas_e_notificacao",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "*/5 8-18 * * 1-6"
+            },
+            {
+              "field": "cronExpression",
+              "expression": "0 19 * * *"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -1664,
+        448
+      ],
+      "id": "4fa7c000-13f3-41c5-adda-c982f44e017b",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "function toNumberBR(value) {\n  if (value === undefined || value === null || value === '') {\n    return null;\n  }\n\n  let s = String(value).trim();\n\n  // Remove R$, espaços e caracteres que não sejam número, vírgula, ponto ou sinal negativo\n  s = s.replace(/[^\\d,.-]/g, '');\n\n  // Converte 1.234,56 para 1234.56\n  if (s.includes(',') && s.includes('.')) {\n    s = s.replace(/\\./g, '').replace(',', '.');\n  } else if (s.includes(',')) {\n    s = s.replace(',', '.');\n  }\n\n  const n = Number(s);\n  return Number.isFinite(n) ? n : null;\n}\n\nfunction toPostgresDate(value) {\n  if (value === undefined || value === null || value === '') {\n    return null;\n  }\n\n  const s = String(value).trim();\n\n  // Timestamp em milissegundos\n  if (/^\\d+$/.test(s)) {\n    return new Date(Number(s)).toISOString();\n  }\n\n  const d = new Date(s);\n\n  if (isNaN(d.getTime())) {\n    return null;\n  }\n\n  return d.toISOString();\n}\n\nconst output = [];\n\n// Pega todos os itens que vieram do Merge\nconst inputItems = $input.all();\n\nfor (const item of inputItems) {\n  const currentJson = item.json;\n\n  // Compatível com retorno vindo em body ou direto no json\n  const response = currentJson.body ?? currentJson;\n\n  // Cada página do HubSpot tem seu próprio results\n  const results = response.results ?? [];\n\n  for (const contact of results) {\n    const p = contact.properties ?? {};\n\n    output.push({\n      json: {\n        hs_object_id: String(p.hs_object_id ?? contact.id),\n\n        firstname: p.firstname ?? null,\n\n        hubspot_owner_id: p.hubspot_owner_id ?? null,\n\n        equipe: p.equipe ?? null,\n\n        status_da_matricula: p.status_da_matricula ?? null,\n\n        valor_da_entrada: toNumberBR(p.valor_da_entrada),\n\n        forma_de_pagamento: p.forma_de_pagamento ?? null,\n\n        data_da_entrada: toPostgresDate(p.data_da_entrada),\n\n        origem: p.origem ?? null,\n\n        tipo_de_publicacao: p.tipo_de_publicacao ?? null,\n\n        categoria_do_produto: p.categoria_do_produto ?? null\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1248,
+        448
+      ],
+      "id": "b6e63e18-9820-4db6-b5ca-f8ad1bb60fc5",
+      "name": "Trata os dados"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO vendas (\n    id,\n    nome,\n    proprietario_contato,\n    equipe,\n    stts_matricula,\n    valor_entrada,\n    forma_pgto,\n    data_entrada,\n    origem,\n    tipo_publi,\n    curso_ofertado\n)\nVALUES (\n    {{$json.hs_object_id}},\n    '{{$json.firstname}}',\n    '{{$json.hubspot_owner_id}}',\n    '{{$json.equipe}}',\n    '{{$json.status_da_matricula}}',\n    {{$json.valor_da_entrada}},\n    '{{$json.forma_de_pagamento}}',\n    '{{$json.data_da_entrada}}',\n    '{{$json.origem}}',\n    '{{$json.tipo_de_publicacao}}',\n    '{{$json.categoria_do_produto}}'\n)\nON CONFLICT (id) DO UPDATE SET\n    nome = EXCLUDED.nome,\n    proprietario_contato = EXCLUDED.proprietario_contato,\n    equipe = EXCLUDED.equipe,\n    stts_matricula = EXCLUDED.stts_matricula,\n    valor_entrada = EXCLUDED.valor_entrada,\n    forma_pgto = EXCLUDED.forma_pgto,\n    data_entrada = EXCLUDED.data_entrada,\n    origem = EXCLUDED.origem,\n    tipo_publi = EXCLUDED.tipo_publi,\n    curso_ofertado = EXCLUDED.curso_ofertado\nRETURNING\n    id,\n    proprietario_contato,\n    equipe,\n    valor_entrada,\n    forma_pgto,\n    stts_matricula,\n    tipo_publi,\n    data_entrada;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1104,
+        448
+      ],
+      "id": "a440c503-c4ac-4a58-92a7-4929a89c341a",
+      "name": "UPSERT base"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "UPDATE sync_control\nSET\n    last_success_at = '{{ $(\"Buscar sync vendas\").first().json.run_started_at }}'::timestamptz,\n    updated_at = NOW()\nWHERE workflow_name = 'hubspot_vendas';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        608,
+        592
+      ],
+      "id": "9204a9fe-4e6b-4319-95fc-a1a270610f53",
+      "name": "Atualiza data de execucao"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "sendHeaders": true,
+        "specifyHeaders": "json",
+        "jsonHeaders": "{\n  \"Authorization\": \"Bearer {token_hubspot}\",\n  \"Content-Type\": \"application/json\"\n}",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"limit\": 200,\n  \"properties\": [\n    \"firstname\",\n    \"hs_object_id\",\n    \"hubspot_owner_id\",\n    \"equipe\",\n    \"status_da_matricula\",\n    \"valor_da_entrada\",\n    \"forma_de_pagamento\",\n    \"data_da_entrada\",\n    \"origem\",\n    \"tipo_de_publicacao\",\n    \"categoria_do_produto\",\n    \"lastmodifieddate\"\n  ],\n  \"filterGroups\": [\n    {\n      \"filters\": [\n        {\n          \"propertyName\": \"equipe\",\n          \"operator\": \"NOT_IN\",\n          \"values\": [\n            \"🍀 Pós Venda\"\n          ]\n        },\n        {\n          \"propertyName\": \"data_da_entrada\",\n          \"operator\": \"GTE\",\n          \"value\": \"{{ new Date('2026-06-01T00:00:00-03:00').getTime().toString() }}\"\n        },\n        {\n          \"propertyName\": \"lastmodifieddate\",\n          \"operator\": \"GT\",\n          \"value\": \"{{$json.last_success_ms}}\"\n        },\n        {\n          \"propertyName\": \"lastmodifieddate\",\n          \"operator\": \"LTE\",\n          \"value\": \"{{ $json.run_started_ms }}\"\n        }\n      ]\n    }\n  ]\n}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $pageCount === 0 ? 0 : Number($response.body.paging.next.after) }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ $pageCount > 0 && !$response.body.paging?.next?.after }}",
+              "limitPagesFetched": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -1392,
+        448
+      ],
+      "id": "5354410f-cdd8-4d53-9f9e-0fc1af9bb782",
+      "name": "HubSpot Pagina 1",
+      "retryOnFail": true,
+      "maxTries": 5,
+      "waitBetweenTries": 5000
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    workflow_name,\n    last_success_at,\n\n    FLOOR(\n        EXTRACT(EPOCH FROM (last_success_at - INTERVAL '5 minutes')) * 1000\n    )::BIGINT::TEXT AS last_success_ms,\n\n    NOW() AS run_started_at,\n\n    FLOOR(\n        EXTRACT(EPOCH FROM NOW()) * 1000\n    )::BIGINT::TEXT AS run_started_ms\nFROM sync_control\nWHERE workflow_name = 'hubspot_vendas';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -1536,
+        448
+      ],
+      "id": "50bfc628-8e14-4b41-80dc-f65a4666f0ca",
+      "name": "Buscar sync vendas"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    EXISTS (\n        SELECT 1\n        FROM vendas_notificadas\n        WHERE id_venda = '{{ $json.id }}'\n    ) AS ja_notificou,\n\n    '{{ $json.id }}' AS id_venda,\n    '{{ $json.vendedor }}' AS vendedor,\n    '{{ $json.equipe }}' AS equipe,\n    {{ $json.valor }}::numeric AS valor,\n    '{{ $json.forma_pagamento }}' AS forma_pagamento,\n    '{{ $json.status_matricula }}' AS status_matricula,\n    '{{ $json.tipo_publicacao }}' AS tipo_publicacao,\n    '{{ $json.data_venda }}' AS data_venda;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -688,
+        240
+      ],
+      "id": "16cbac7e-e56a-4c89-869f-58208b4b4613",
+      "name": "Verifica se ja notificou",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT\n    '{{ $json.id }}' AS id,\n    COALESCE(v.nome_vendedor, '{{ $json.proprietario_contato }}') AS vendedor,\n    COALESCE(v.equipe, '{{ $json.equipe }}') AS equipe,\n    {{ $json.valor_entrada }}::numeric AS valor,\n    '{{ $json.forma_pgto }}' AS forma_pagamento,\n    '{{ $json.stts_matricula }}' AS status_matricula,\n    '{{ $json.tipo_publi }}' AS tipo_publicacao,\n    '{{ $json.data_entrada }}' AS data_venda\nFROM (SELECT 1) x\nLEFT JOIN vendedores v\n    ON v.id_leads::text = '{{ $json.proprietario_contato }}'\n    OR v.id::text = '{{ $json.proprietario_contato }}'\nWHERE '{{ $json.stts_matricula }}' IN ('🟢 Matricula Ativa','💰 Entrada Paga');\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -832,
+        336
+      ],
+      "id": "d6aaf22a-bb91-419d-8320-db67d4a0fcfc",
+      "name": "Pega nome_vendedor"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO vendas_notificadas (\n    id_venda,\n    vendedor,\n    equipe,\n    valor,\n    forma_pagamento,\n    tipo_publicacao,\n    status_matricula,\n    notificado_em\n)\nVALUES (\n    '{{ $json.idVenda }}',\n    '{{ $json.vendedor }}',\n    '{{ $json.equipe }}',\n    {{ $json.valor }},\n    '{{ $json.formaPagamento }}',\n    '{{ $json.tipoPublicacao }}',\n    '{{ $json.statusMatricula }}',\n    NOW()\n)\nON CONFLICT (id_venda) DO NOTHING;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        336,
+        160
+      ],
+      "id": "3b857461-1fa7-456b-9e5b-358fbf918989",
+      "name": "Registrar notificacao"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{URL_API_NOTIFICADOR}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "{TOKEN_API}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"idVenda\": \"{{ $json.id_venda }}\",\n  \"vendedor\": \"{{ $json.vendedor }}\",\n  \"equipe\": \"{{ $json.equipe }}\",\n  \"valor\": {{ $json.valor }},\n  \"formaPagamento\": \"{{ $json.forma_pagamento }}\",\n  \"statusMatricula\": \"{{ $json.status_matricula }}\",\n  \"tipoPublicacao\": \"{{ $json.tipo_publicacao }}\",\n  \"dataVenda\": \"{{ $json.data_venda }}\",\n  \"mensagem\": \"{{ $json.vendedor }} acabou de fazer uma venda\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        160
+      ],
+      "id": "ac277d6c-d995-4039-bfa7-598dd685f5d8",
+      "name": "Envia pop-up"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "7e246606-be93-4bfe-a674-0854dba9f33a",
+              "leftValue": "={{ $json.ja_notificou === false }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -512,
+        240
+      ],
+      "id": "9526bdc2-86c8-4ff1-83b3-d878adf16dad",
+      "name": "If - Não foi notificada",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH venda_atual AS (\n    SELECT\n        '{{ $json.id_venda }}'::text AS id_venda,\n        '{{ String($json.vendedor || \"\").replace(/'/g, \"''\") }}'::text AS vendedor,\n        '{{ String($json.equipe || \"\").replace(/'/g, \"''\") }}'::text AS equipe,\n        {{ $json.valor || 0 }}::numeric AS valor,\n        '{{ String($json.forma_pagamento || \"\").replace(/'/g, \"''\") }}'::text AS forma_pagamento,\n        '{{ String($json.status_matricula || \"\").replace(/'/g, \"''\") }}'::text AS status_matricula,\n        '{{ String($json.tipo_publicacao || \"\").replace(/'/g, \"''\") }}'::text AS tipo_publicacao,\n        '{{ $json.data_venda }}'::text AS data_venda\n),\n\nbase AS (\n    SELECT\n        COALESCE(vd.nome_vendedor, v.proprietario_contato) AS vendedor,\n        COALESCE(vd.equipe, v.equipe) AS equipe,\n        v.valor_entrada,\n        vd.meta_vendas,\n        vd.meta_arrecadacao\n    FROM vendas v\n    LEFT JOIN vendedores vd\n        ON v.proprietario_contato::text = vd.id::text\n        OR v.proprietario_contato::text = vd.id_leads::text\n        OR v.proprietario_contato::text = vd.nome_vendedor\n    WHERE v.data_entrada >= date_trunc('month', CURRENT_DATE)\n      AND v.data_entrada < date_trunc('month', CURRENT_DATE) + interval '1 month'\n      AND (\n            v.stts_matricula ILIKE '%Entrada Paga%'\n            OR v.stts_matricula ILIKE '%Matricula Ativa%'\n      )\n      AND COALESCE(vd.nome_vendedor, v.proprietario_contato) = (SELECT vendedor FROM venda_atual)\n),\n\ntotais AS (\n    SELECT\n        vendedor,\n        equipe,\n        COUNT(*)::numeric AS vendas_atual,\n        COALESCE(SUM(valor_entrada), 0)::numeric AS arrecadacao_atual,\n        MAX(meta_vendas)::numeric AS meta_vendas,\n        MAX(meta_arrecadacao)::numeric AS meta_arrecadacao\n    FROM base\n    GROUP BY vendedor, equipe\n),\n\nchecks AS (\n    SELECT\n        'Vendas'::text AS tipo_meta,\n        vendas_atual AS valor_atual,\n        meta_vendas AS valor_meta,\n        vendas_atual - 1 AS valor_anterior\n    FROM totais\n\n    UNION ALL\n\n    SELECT\n        'Arrecadação'::text AS tipo_meta,\n        arrecadacao_atual AS valor_atual,\n        meta_arrecadacao AS valor_meta,\n        arrecadacao_atual - (SELECT valor FROM venda_atual) AS valor_anterior\n    FROM totais\n),\n\nresultado AS (\n    SELECT\n        c.tipo_meta,\n        c.valor_atual,\n        c.valor_meta\n    FROM checks c\n    WHERE c.valor_meta IS NOT NULL\n      AND c.valor_meta > 0\n      AND c.valor_atual >= c.valor_meta\n      AND c.valor_anterior < c.valor_meta\n      AND NOT EXISTS (\n          SELECT 1\n          FROM metas_notificadas mn\n          WHERE mn.vendedor = (SELECT vendedor FROM venda_atual)\n            AND mn.tipo_meta = c.tipo_meta\n            AND mn.mes_referencia = date_trunc('month', CURRENT_DATE)::date\n      )\n    ORDER BY\n        CASE\n            WHEN c.tipo_meta = 'Vendas' THEN 1\n            WHEN c.tipo_meta = 'Arrecadação' THEN 2\n            ELSE 3\n        END\n    LIMIT 1\n)\n\nSELECT\n    CASE WHEN EXISTS (SELECT 1 FROM resultado) THEN true ELSE false END AS bateu_meta,\n\n    (SELECT tipo_meta FROM resultado) AS tipo_meta,\n    COALESCE((SELECT valor_meta FROM resultado), 0) AS meta_valor,\n    COALESCE((SELECT valor_atual FROM resultado), 0) AS valor_atual_meta,\n\n    (SELECT id_venda FROM venda_atual) AS id_venda,\n    (SELECT vendedor FROM venda_atual) AS vendedor,\n    (SELECT equipe FROM venda_atual) AS equipe,\n    (SELECT valor FROM venda_atual) AS valor,\n    (SELECT forma_pagamento FROM venda_atual) AS forma_pagamento,\n    (SELECT status_matricula FROM venda_atual) AS status_matricula,\n    (SELECT tipo_publicacao FROM venda_atual) AS tipo_publicacao,\n    (SELECT data_venda FROM venda_atual) AS data_venda;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -320,
+        80
+      ],
+      "id": "94eb3274-e007-4409-bda8-7dc9cb0ef06c",
+      "name": "Verifica meta batida"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "77795593-7727-49be-95f1-0270709bfafd",
+              "leftValue": "={{ $json.bateu_meta === true }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -176,
+        80
+      ],
+      "id": "85ea45ac-ca60-443d-b78f-a1a20f924437",
+      "name": "If-Bateu Meta"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "{URL_API_NOTIFICADOR}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Webhook-Token",
+              "value": "{TOKEN_API}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"idVenda\": \"meta-{{ $json.id_venda }}-{{ $json.tipo_meta }}\",\n  \"vendedor\": \"{{ $json.vendedor }}\",\n  \"equipe\": \"{{ $json.equipe }}\",\n  \"valor\": {{ $json.valor }},\n  \"formaPagamento\": \"{{ $json.forma_pagamento }}\",\n  \"statusMatricula\": \"{{ $json.status_matricula }}\",\n  \"tipoPublicacao\": \"{{ $json.tipo_publicacao }}\",\n  \"dataVenda\": \"{{ $json.data_venda }}\",\n  \"mensagem\": \"{{ $json.vendedor }} acabou de bater meta de {{ $json.tipo_meta }}\",\n  \"bateuMeta\": true,\n  \"tipoMeta\": \"{{ $json.tipo_meta }}\",\n  \"metaValor\": {{ $json.meta_valor }},\n  \"valorAtualMeta\": {{ $json.valor_atual_meta }}\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        0,
+        0
+      ],
+      "id": "af1ffd50-5957-45ae-97e6-666dafb8de5b",
+      "name": "Envia meta"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "a1be7c16-b4e6-4606-b39c-bf2dfca2222e",
+              "leftValue": "={{ \n  ['Entrada Paga', 'Matricula Ativa']\n    .includes($json.stts_matricula) \n}}",
+              "rightValue": "=true",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d8570cd5-a8ca-4e38-924d-ec343a9297ac",
+              "leftValue": "={{\n  (() => {\n    const valor = $json.data_entrada;\n\n    if (!valor) return false;\n\n    const dataEntrada = /^\\d+$/.test(String(valor))\n      ? new Date(Number(valor))\n      : new Date(valor);\n\n    if (isNaN(dataEntrada.getTime())) return false;\n\n    const hojeBR = new Date().toLocaleDateString('en-CA', {\n      timeZone: 'America/Sao_Paulo'\n    });\n\n    const entradaBR = dataEntrada.toLocaleDateString('en-CA', {\n      timeZone: 'America/Sao_Paulo'\n    });\n\n    return entradaBR === hojeBR;\n  })()\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "67e55c7d-a6fe-4e55-9259-023a685aedd1",
+              "leftValue": "={{ \n  ['EQUIPE l', 'EQUIPE 2', 'EQUIPE 3']\n    .includes(String($json.equipe ?? '').trim())\n}}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        -976,
+        448
+      ],
+      "id": "29deb1c5-a45a-44d2-8691-f9bee37f4281",
+      "name": "IF - Gera Pop-Up"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO metas_notificadas (\n    vendedor,\n    equipe,\n    tipo_meta,\n    mes_referencia,\n    valor_meta,\n    valor_atual,\n    notificado_em\n)\nVALUES (\n    '{{ String($('Verifica meta batida').item.json.vendedor || \"\").replace(/'/g, \"''\") }}',\n    '{{ String($('Verifica meta batida').item.json.equipe || \"\").replace(/'/g, \"''\") }}',\n    '{{ String($('Verifica meta batida').item.json.tipo_meta || \"\").replace(/'/g, \"''\") }}',\n    date_trunc('month', CURRENT_DATE)::date,\n    {{ $('Verifica meta batida').item.json.meta_valor }},\n    {{ $('Verifica meta batida').item.json.valor_atual_meta }},\n    NOW()\n)\nON CONFLICT (vendedor, tipo_meta, mes_referencia) DO NOTHING;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        336,
+        0
+      ],
+      "id": "1c133fc4-697f-4c27-bfbe-3ad22c79086e",
+      "name": "Registra meta notificada"
+    },
+    {
+      "parameters": {
+        "amount": 13
+      },
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        176,
+        160
+      ],
+      "id": "bc9ff41a-79ad-45ba-a87f-f2940dbbc8bc",
+      "name": "Wait",
+      "webhookId": "1cff231a-0e3b-480f-8b59-f1970a57a388"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Buscar sync vendas",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Trata os dados": {
+      "main": [
+        [
+          {
+            "node": "UPSERT base",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UPSERT base": {
+      "main": [
+        [
+          {
+            "node": "IF - Gera Pop-Up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HubSpot Pagina 1": {
+      "main": [
+        [
+          {
+            "node": "Trata os dados",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar sync vendas": {
+      "main": [
+        [
+          {
+            "node": "HubSpot Pagina 1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifica se ja notificou": {
+      "main": [
+        [
+          {
+            "node": "If - Não foi notificada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pega nome_vendedor": {
+      "main": [
+        [
+          {
+            "node": "Verifica se ja notificou",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar notificacao": {
+      "main": [
+        [
+          {
+            "node": "Atualiza data de execucao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia pop-up": {
+      "main": [
+        [
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If - Não foi notificada": {
+      "main": [
+        [
+          {
+            "node": "Verifica meta batida",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atualiza data de execucao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Verifica meta batida": {
+      "main": [
+        [
+          {
+            "node": "If-Bateu Meta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If-Bateu Meta": {
+      "main": [
+        [
+          {
+            "node": "Envia meta",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Envia pop-up",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Envia meta": {
+      "main": [
+        [
+          {
+            "node": "Registra meta notificada",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF - Gera Pop-Up": {
+      "main": [
+        [
+          {
+            "node": "Pega nome_vendedor",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Atualiza data de execucao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registra meta notificada": {
+      "main": [
+        [
+          {
+            "node": "Atualiza data de execucao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Registrar notificacao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "822b155d-76a1-44ca-b5fe-7e521426b005",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a8276b49aed8608fc28fee1e8567edfcd447267d49ce19b482e4e2a900c5190c"
+  },
+  "nodeGroups": [],
+  "id": "7sPraP4XL2GpLqs6",
+  "tags": []
+}

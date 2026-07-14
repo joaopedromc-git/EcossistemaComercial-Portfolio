@@ -1,0 +1,53 @@
+﻿========================================
+TABELAS
+========================================
+CREATE TABLE public.leads (
+CREATE TABLE public.vendedores (
+CREATE TABLE public.feriado (
+CREATE TABLE public.exp_temp_leads (
+CREATE TABLE public.vendas (
+CREATE TABLE public.exp_temp_vendas (
+CREATE TABLE public.metas_notificadas (
+CREATE TABLE public.portal_acesso_equipes (
+CREATE TABLE public.sync_control (
+CREATE TABLE public.vendas_notificadas (
+CREATE TABLE public.vendedores_backup_20260706 (
+
+========================================
+VIEWS
+========================================
+CREATE VIEW public.atribuidos_hoje AS
+CREATE VIEW public.vw_calendario AS
+CREATE VIEW public.dias_uteis_mes AS
+CREATE VIEW public.leads_mes AS
+CREATE VIEW public.vendas_mes AS
+CREATE VIEW public.vw_leads_vendedor AS
+CREATE VIEW public.vw_leads_equipes AS
+CREATE VIEW public.vw_vendas_vendedor AS
+CREATE VIEW public.vw_vendas_equipes AS
+CREATE VIEW public.kpi_equipes AS
+CREATE VIEW public.ranking_mensal AS
+CREATE VIEW public.vendas_dia_atual AS
+CREATE VIEW public.vw_classificacao_portal AS
+CREATE VIEW public.vw_kpi_consultor AS
+CREATE VIEW public.vw_kpi_geral AS
+CREATE VIEW public.vw_permissoes_dashboard AS
+CREATE VIEW public.vw_tabela_conversao AS
+CREATE VIEW public.vw_vendas_dias AS
+
+========================================
+FUNÇÕES
+========================================
+CREATE FUNCTION public.alterar_senha_primeiro_acesso(p_id text, p_nova_senha text) RETURNS boolean
+CREATE FUNCTION public.autenticar_usuario_portal(p_codigo_login text, p_senha text) RETURNS TABLE(id text, id_leads text, nome_vendedor text, codigo_login text, equipe text, tipo_acesso text, acesso_superior boolean, primeiro_acesso boolean)
+CREATE FUNCTION public.obter_permissoes_metabase(p_usuario_id text) RETURNS TABLE(ids_vendas text[], ids_leads text[])
+CREATE FUNCTION public.obter_permissoes_metabase(p_usuario_id text, p_modo text DEFAULT 'COMUM'::text) RETURNS TABLE(ids_vendas text[], ids_leads text[])
+
+========================================
+ÍNDICES
+========================================
+CREATE INDEX idx_vendedores_acesso_superior ON public.vendedores USING btree (acesso_superior);
+CREATE INDEX idx_vendedores_status ON public.vendedores USING btree (status);
+CREATE INDEX idx_vendedores_supervisor ON public.vendedores USING btree (supervisor);
+CREATE UNIQUE INDEX uq_vendedores_codigo_login ON public.vendedores USING btree (lower(btrim((codigo_login)::text))) WHERE ((codigo_login IS NOT NULL) AND (btrim((codigo_login)::text) <> ''::text));
+CREATE UNIQUE INDEX uq_vendedores_hubspot_company ON public.vendedores USING btree (hubspot_company_id) WHERE (hubspot_company_id IS NOT NULL);

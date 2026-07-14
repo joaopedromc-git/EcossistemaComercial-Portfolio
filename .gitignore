@@ -1,0 +1,253 @@
+# ============================================================
+# .NET / Visual Studio
+# ============================================================
+
+**/bin/
+**/obj/
+**/.vs/
+**/.idea/
+**/.vscode/
+
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+*.csproj.user
+
+*.dll
+*.exe
+*.pdb
+*.cache
+*.nupkg
+*.snupkg
+
+TestResults/
+**/TestResults/
+coverage/
+**/coverage/
+*.coverage
+*.coveragexml
+
+artifacts/
+**/artifacts/
+publish/
+**/publish/
+
+
+# ============================================================
+# Configuracoes locais das aplicacoes
+# ============================================================
+
+**/appsettings.json
+**/appsettings.Development.json
+**/appsettings.Production.json
+**/appsettings.Local.json
+**/appsettings.*.local.json
+
+# Mantem os arquivos de exemplo
+!**/appsettings.example.json
+
+secrets.json
+**/secrets.json
+**/config.local.ps1
+**/credencial-*.txt
+**/credenciais-*.txt
+
+
+# ============================================================
+# Variaveis de ambiente
+# ============================================================
+
+.env
+.env.*
+**/.env
+**/.env.*
+
+# Mantem os modelos de configuracao
+!.env.example
+!**/.env.example
+
+
+# ============================================================
+# Logs e arquivos temporarios
+# ============================================================
+
+*.log
+logs/
+**/logs/
+
+temp/
+tmp/
+**/temp/
+**/tmp/
+
+*.tmp
+*.temp
+*.swp
+*.lock
+*.pid
+
+arvore.txt
+arvore-*.txt
+tree.txt
+tree-*.txt
+
+
+# ============================================================
+# PostgreSQL e bancos locais
+# ============================================================
+
+*.dump
+*.backup
+*.bak
+*.sql.gz
+
+*.db
+*.sqlite
+*.sqlite3
+
+pgdata/
+postgres-data/
+**/pgdata/
+**/postgres-data/
+
+# Nao ignorar arquivos SQL do projeto.
+# Schema, seeds, testes e queries devem ser versionados.
+
+
+# ============================================================
+# n8n
+# ============================================================
+
+.n8n/
+**/.n8n/
+
+n8n_data/
+**/n8n_data/
+
+credentials/
+**/credentials/
+
+executions/
+**/executions/
+
+binaryData/
+**/binaryData/
+
+database.sqlite
+database.sqlite-*
+**/database.sqlite
+**/database.sqlite-*
+
+# Os arquivos JSON de workflows sanitizados devem permanecer.
+
+
+# ============================================================
+# Metabase
+# ============================================================
+
+metabase.jar
+**/metabase.jar
+
+metabase.db/
+metabase-data/
+metabase_data/
+
+**/metabase.db/
+**/metabase-data/
+**/metabase_data/
+
+*.mv.db
+*.trace.db
+
+plugins/
+**/plugins/
+
+# Queries, documentacao e screenshots devem permanecer.
+
+
+# ============================================================
+# Certificados, chaves e credenciais
+# ============================================================
+
+*.pfx
+*.p12
+*.pem
+*.key
+*.keystore
+*.jks
+*.cer
+*.crt
+
+.htpasswd
+**/.htpasswd
+
+id_rsa
+id_rsa.pub
+id_ed25519
+id_ed25519.pub
+
+
+# ============================================================
+# Backups e copias locais
+# ============================================================
+
+*.old
+*.orig
+*.copy
+*.save
+
+*~
+*.zip.backup
+*.tar.backup
+
+backup/
+backups/
+**/backup/
+**/backups/
+
+
+# ============================================================
+# Sistema operacional
+# ============================================================
+
+.DS_Store
+**/.DS_Store
+
+Thumbs.db
+Desktop.ini
+
+$RECYCLE.BIN/
+System Volume Information/
+
+
+# ============================================================
+# Ferramentas e editores
+# ============================================================
+
+.history/
+**/.history/
+
+_ReSharper*/
+*.DotSettings.user
+
+node_modules/
+**/node_modules/
+
+
+# ============================================================
+# Infraestrutura local
+# ============================================================
+
+docker-compose.override.yml
+docker-compose.local.yml
+**/docker-compose.override.yml
+**/docker-compose.local.yml
+
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+**/.terraform/
+
+*.tfvars
+!*.tfvars.example

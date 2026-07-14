@@ -1,0 +1,80 @@
+@model PortalVendas.Models.LoginViewModel
+
+@{
+    ViewData["Title"] = "Entrar";
+}
+
+@if (TempData["Mensagem"] is string mensagem)
+{
+    <div class="alert alert-success">
+        @mensagem
+    </div>
+}
+
+<div class="row justify-content-center mt-5">
+    <div class="col-md-5 col-lg-4">
+        <div class="card shadow-sm">
+            <div class="card-body p-4">
+                <h1 class="h3 text-center mb-4">
+                    Portal de Vendas
+                </h1>
+
+                <form asp-action="Login" method="post">
+                    <input
+                        type="hidden"
+                        name="returnUrl"
+                        value="@ViewData["ReturnUrl"]" />
+
+                    <div
+                        asp-validation-summary="ModelOnly"
+                        class="text-danger mb-3">
+                    </div>
+
+                    <div class="mb-3">
+                        <label
+                            asp-for="CodigoLogin"
+                            class="form-label">
+                        </label>
+
+                        <input
+                            asp-for="CodigoLogin"
+                            class="form-control"
+                            autocomplete="username" />
+
+                        <span
+                            asp-validation-for="CodigoLogin"
+                            class="text-danger">
+                        </span>
+                    </div>
+
+                    <div class="mb-3">
+                        <label
+                            asp-for="Senha"
+                            class="form-label">
+                        </label>
+
+                        <input
+                            asp-for="Senha"
+                            class="form-control"
+                            autocomplete="current-password" />
+
+                        <span
+                            asp-validation-for="Senha"
+                            class="text-danger">
+                        </span>
+                    </div>
+
+                    <button
+                        type="submit"
+                        class="btn btn-primary w-100">
+                        Entrar
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

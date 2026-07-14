@@ -1,0 +1,50 @@
+@{
+    ViewData["Title"] = "Dashboard Geral";
+    var metabaseUrl = ViewData["MetabaseUrl"] as string;
+}
+
+<div class="container-fluid px-0">
+    <div class="d-flex justify-content-between align-items-center px-4 py-3"
+         style="background-color: #111827; border-bottom: 1px solid #1f2937;">
+        
+        <div class="d-flex align-items-center gap-3">
+            <img src="~/images/logo1.png"
+                 alt="Logo 1"
+                 style="height: 48px; width: auto;" />
+
+            <div>
+                <h1 class="h4 mb-1 text-white">
+                    Dashboard
+                </h1>
+
+                <small class="text-light">
+                    Olá, @User.Identity?.Name - @User.FindFirst("tipo_acesso")?.Value
+                </small>
+            </div>
+        </div>
+
+        <form asp-controller="Conta"
+              asp-action="Sair"
+              method="post"
+              class="mb-0">
+            <button type="submit" class="btn btn-outline-light btn-sm">
+                Sair
+            </button>
+        </form>
+    </div>
+
+    @if (string.IsNullOrWhiteSpace(metabaseUrl))
+    {
+        <div class="alert alert-danger m-3">
+            Não foi possível carregar o dashboard geral.
+        </div>
+    }
+    else
+    {
+        <iframe
+            src="@metabaseUrl"
+            style="width: 100%; height: calc(100vh - 78px); border: none; display: block; background-color: #111827;"
+            allowfullscreen>
+        </iframe>
+    }
+</div>

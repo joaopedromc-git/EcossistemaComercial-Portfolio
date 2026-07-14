@@ -1,0 +1,45 @@
+@{
+    ViewData["Title"] = "Escolher dashboard";
+}
+
+<div class="container py-5 text-white">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card bg-dark border-secondary shadow">
+                <div class="card-body p-4 text-center">
+                    <h1 class="h4 mb-3">
+                        Escolha o dashboard
+                    </h1>
+
+                    <p class="text-light mb-4">
+                        Olá, @User.Identity?.Name.
+                    </p>
+
+                    <div class="d-grid gap-3">
+                        <a asp-controller="Home"
+                           asp-action="Superior"
+                           class="btn btn-primary">
+                            Dashboard superior geral
+                        </a>
+
+                        <a asp-controller="Home"
+                           asp-action="Equipe"
+                           class="btn btn-outline-light">
+                            Dashboard da equipe
+                        </a>
+                    </div>
+
+                    <form asp-controller="Conta"
+                          asp-action="Sair"
+                          method="post"
+                          class="mt-4">
+                        <button type="submit"
+                                class="btn btn-sm btn-outline-danger">
+                            Sair
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

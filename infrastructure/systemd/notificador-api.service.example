@@ -1,0 +1,27 @@
+[Unit]
+Description=Portfolio - API de Notificacoes
+After=network.target
+
+[Service]
+Type=simple
+
+WorkingDirectory=/opt/ecossistema-portfolio/apps/notificador-api
+
+ExecStart=/usr/bin/dotnet /opt/ecossistema-portfolio/apps/notificador-api/NotificadorVendasApi.dll
+
+Restart=always
+RestartSec=5
+
+User=www-data
+Group=www-data
+
+Environment=ASPNETCORE_ENVIRONMENT=Production
+Environment=ASPNETCORE_URLS=http://127.0.0.1:5000
+
+EnvironmentFile=-/etc/ecossistema-portfolio/notificador-api.env
+
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

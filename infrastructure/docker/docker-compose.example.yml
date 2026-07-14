@@ -1,0 +1,104 @@
+name: ecossistema-portfolio
+
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: portfolio_postgres
+    restart: unless-stopped
+
+    environment:
+      POSTGRES_DB: ${POSTGRES_DATABASE:-ecossistema_portfolio}
+      POSTGRES_USER: ${POSTGRES_ADMIN_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_ADMIN_PASSWORD}
+      TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
+
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
+    volumes:
+      - portfolio_postgres_data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          pg_isready
+          -U ${POSTGRES_ADMIN_USER:-postgres}
+          -d ${POSTGRES_DATABASE:-ecossistema_portfolio}
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+    networks:
+      - portfolio_network
+
+  metabase:
+    image: ${METABASE_IMAGE:-metabase/metabase:latest}
+    container_name: portfolio_metabase
+    restart: unless-stopped
+
+    environment:
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: postgres
+      MB_DB_PORT: 5432
+      MB_DB_DBNAME: ${METABASE_APP_DB_DATABASE:-metabase_portfolio_app}
+      MB_DB_USER: ${METABASE_APP_DB_USER:-metabase_portfolio_app}
+      MB_DB_PASS: ${METABASE_APP_DB_PASSWORD}
+      MB_JETTY_PORT: 3000
+      TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
+
+    ports:
+      - "127.0.0.1:3000:3000"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - portfolio_network
+
+  n8n:
+    image: ${N8N_IMAGE:-n8nio/n8n:latest}
+    container_name: portfolio_n8n
+    restart: unless-stopped
+
+    environment:
+      DB_TYPE: postgresdb
+      DB_POSTGRESDB_HOST: postgres
+      DB_POSTGRESDB_PORT: 5432
+      DB_POSTGRESDB_DATABASE: ${N8N_APP_DB_DATABASE:-n8n_portfolio_app}
+      DB_POSTGRESDB_USER: ${N8N_APP_DB_USER:-n8n_portfolio_app}
+      DB_POSTGRESDB_PASSWORD: ${N8N_APP_DB_PASSWORD}
+
+      N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
+      N8N_HOST: ${N8N_PUBLIC_HOST:-n8n.example.com}
+      N8N_PROTOCOL: ${N8N_PROTOCOL:-https}
+      WEBHOOK_URL: ${N8N_WEBHOOK_URL:-https://n8n.example.com/}
+
+      GENERIC_TIMEZONE: ${APP_TIMEZONE:-America/Sao_Paulo}
+      TZ: ${APP_TIMEZONE:-America/Sao_Paulo}
+
+    ports:
+      - "127.0.0.1:5678:5678"
+
+    volumes:
+      - portfolio_n8n_data:/home/node/.n8n
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    networks:
+      - portfolio_network
+
+networks:
+  portfolio_network:
+    name: portfolio_network
+    driver: bridge
+
+volumes:
+  portfolio_postgres_data:
+    name: portfolio_postgres_data
+
+  portfolio_n8n_data:
+    name: portfolio_n8n_data

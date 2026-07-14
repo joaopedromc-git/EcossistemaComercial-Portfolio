@@ -1,0 +1,12 @@
+﻿{
+  "idVenda": "demo-1001",
+  "vendedor": "Ana Demo",
+  "equipe": "Equipe Horizonte",
+  "valor": 500.00,
+  "formaPagamento": "Pagamento imediato",
+  "statusMatricula": "Matrícula ativa",
+  "tipoPublicacao": "Categoria A",
+  "dataVenda": "2026-01-15T10:30:00-03:00",
+  "bateuMeta": false,
+  "tipoMeta": null
+}

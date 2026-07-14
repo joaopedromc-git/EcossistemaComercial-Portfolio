@@ -1,0 +1,360 @@
+{
+  "name": "sync_leads",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours"
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -528,
+        208
+      ],
+      "id": "0423db3e-4f39-4717-bb70-e3bd90359e25",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "jsCode": "const row = $input.first().json;\n\nconst startDateMs = new Date(\n  \"2026-06-01T00:00:00-03:00\"\n).getTime();\n\nconst lastSuccessAt = row.last_success_at ?? '2026-06-01T00:00:00.000';\n\nfunction dateBrasilToMs(value) {\n  const text = String(value).replace(' ', 'T');\n\n  // Se já vier com fuso, usa direto\n  if (text.endsWith('Z') || /[+-]\\d{2}:\\d{2}$/.test(text)) {\n    return new Date(text).getTime();\n  }\n\n  // Se vier sem fuso, assume Brasil UTC-3\n  return new Date(`${text}-03:00`).getTime();\n}\n\nfunction formatBrasilDate(date) {\n  return new Intl.DateTimeFormat('en-CA', {\n    timeZone: 'America/Sao_Paulo',\n    year: 'numeric',\n    month: '2-digit',\n    day: '2-digit'\n  }).format(date);\n}\n\nconst lastSuccessMs = dateBrasilToMs(lastSuccessAt);\n\n// Instante atual real\nconst nowMs = Date.now();\nconst now = new Date(nowMs);\n\n// Data atual no Brasil\nconst [yearBrasil, monthBrasil] = formatBrasilDate(now)\n  .split('-')\n  .map(Number);\n\n// Início do mês atual no Brasil: 01/MM/AAAA 00:00 UTC-3\nconst monthStartMs = new Date(\n  `${yearBrasil}-${String(monthBrasil).padStart(2, '0')}-01T00:00:00.000-03:00`\n).getTime();\n\n// Calcula próximo mês\nlet nextMonth = monthBrasil + 1;\nlet nextYear = yearBrasil;\n\nif (nextMonth === 13) {\n  nextMonth = 1;\n  nextYear += 1;\n}\n\n// Início do próximo mês no Brasil: 01/MM/AAAA 00:00 UTC-3\nconst nextMonthStartMs = new Date(\n  `${nextYear}-${String(nextMonth).padStart(2, '0')}-01T00:00:00.000-03:00`\n).getTime();\n\n// Apenas para visualizar no horário do Brasil\nconst nowBrasil = new Date(nowMs - 3 * 60 * 60 * 1000)\n  .toISOString()\n  .replace('T', ' ')\n  .replace('Z', '');\n\nreturn [\n  {\n    json: {\n      after: null,\n\n      lastSuccessAt,\n      lastSuccessMs,\n\n      startDateMs,\n      \n      nowMs,\n      nowBrasil,\n\n      monthStartMs,\n      nextMonthStartMs,\n\n      // Campos de conferência\n      monthStartBrasil: `${yearBrasil}-${String(monthBrasil).padStart(2, '0')}-01 00:00:00`,\n      nextMonthStartBrasil: `${nextYear}-${String(nextMonth).padStart(2, '0')}-01 00:00:00`,\n\n      monthStartIsoUtc: new Date(monthStartMs).toISOString(),\n      nextMonthStartIsoUtc: new Date(nextMonthStartMs).toISOString()\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -208,
+        208
+      ],
+      "id": "e2c6f50a-4a1a-48a2-a268-69fecb1a3094",
+      "name": "Preparar busca"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT last_success_at\nFROM sync_control\nWHERE workflow_name = 'hubspot_leads';",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        -368,
+        208
+      ],
+      "id": "4dfeab3c-b834-43f5-8da8-eabf1dbfe297",
+      "name": "Pegar ultima execucao"
+    },
+    {
+      "parameters": {
+        "jsCode": "function toPostgresDate(value) {\n  if (value === undefined || value === null || value === '') {\n    return null;\n  }\n\n  const s = String(value).trim();\n\n  // Timestamp em milissegundos\n  if (/^\\d+$/.test(s)) {\n    return new Date(Number(s)).toISOString();\n  }\n\n  const d = new Date(s);\n\n  if (isNaN(d.getTime())) {\n    return null;\n  }\n\n  return d.toISOString();\n}\n\nconst output = [];\n\nconst inputItems = $input.all();\n\nfor (const item of inputItems) {\n  const response = item.json.body ?? item.json;\n  const results = response.results ?? [];\n\n  for (const contact of results) {\n    const p = contact.properties ?? {};\n\n    const firstname = p.firstname ?? '';\n    const lastname = p.lastname ?? '';\n\n    const nome = `${firstname} ${lastname}`\n      .replace(/\\s+/g, ' ')\n      .trim();\n\n    output.push({\n      json: {\n        hs_object_id: String(p.hs_object_id ?? contact.id),\n\n        nome: nome || null,\n\n        phone: p.phone ?? null,\n        mobilephone: p.mobilephone ?? null,\n\n        qualificacao: p.qualificacao ?? null,\n        origem: p.origem_ ?? null,\n\n        proprietario_contato: p.hubspot_owner_id ?? null,\n\n        hubspot_owner_assigneddate: toPostgresDate(p.hubspot_owner_assigneddate),\n        lastmodifieddate: toPostgresDate(p.lastmodifieddate)\n      }\n    });\n  }\n}\n\nreturn output;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        512,
+        208
+      ],
+      "id": "5b49678e-aa47-42a2-bf44-8eeaffb62681",
+      "name": "Tratar leads"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO leads (\n    id,\n    nome,\n    numero1,\n    numero2,\n    qualificacao,\n    origem,\n    proprietario_contato,\n    data_atribuicao\n)\nVALUES (\n    {{ $json.hs_object_id }}::bigint,\n    NULLIF('{{ ($json.nome ?? \"\").replace(/'/g, \"''\") }}', ''),\n    NULLIF('{{ ($json.phone ?? \"\").replace(/'/g, \"''\") }}', ''),\n    NULLIF('{{ ($json.mobilephone ?? \"\").replace(/'/g, \"''\") }}', ''),\n    NULLIF('{{ ($json.qualificacao ?? \"\").replace(/'/g, \"''\") }}', ''),\n    NULLIF('{{ ($json.origem ?? \"\").replace(/'/g, \"''\") }}', ''),\n    NULLIF('{{ $json.proprietario_contato ?? \"\" }}', '')::bigint,\n  NULLIF('{{ $json.hubspot_owner_assigneddate ?? \"\" }}', '')::timestamp\n)\nON CONFLICT (id)\nDO UPDATE SET\n    nome = EXCLUDED.nome,\n    numero1 = EXCLUDED.numero1,\n    numero2 = EXCLUDED.numero2,\n    qualificacao = EXCLUDED.qualificacao,\n    origem = EXCLUDED.origem,\n    proprietario_contato = EXCLUDED.proprietario_contato,\n    data_atribuicao = EXCLUDED.data_atribuicao;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        672,
+        208
+      ],
+      "id": "3fe34215-3fe5-4bae-b9a8-b4992a4d96ba",
+      "name": "UPSERT banco"
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO sync_control (\n    workflow_name,\n    last_success_at,\n    updated_at\n)\nVALUES (\n    'hubspot_leads',\n    '{{ $json.nowIso }}'::timestamp,\n    NOW()\n)\nON CONFLICT (workflow_name)\nDO UPDATE SET\n    last_success_at = EXCLUDED.last_success_at,\n    updated_at = NOW();",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [
+        960,
+        208
+      ],
+      "id": "ea0ed222-3515-488f-8e9d-f687781de3df",
+      "name": "Atualizar execucao"
+    },
+    {
+      "parameters": {
+        "jsCode": "const nowBrasil = new Date(Date.now() - 3 * 60 * 60 * 1000)\n  .toISOString()\n  .replace('T', ' ')\n  .replace('Z', '');\n\nreturn [\n  {\n    json: {\n      nowIso: nowBrasil\n    }\n  }\n];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        800,
+        208
+      ],
+      "id": "7ca1839e-0363-4b8a-8047-c0096f6bf344",
+      "name": "Pega hora da att"
+    },
+    {
+      "parameters": {
+        "jsCode": "const requiredFields = [\n  \"startDateMs\",\n  \"lastSuccessMs\",\n  \"nowMs\"\n];\n\nfor (const field of requiredFields) {\n  if ($json[field] === undefined || $json[field] === null) {\n    throw new Error(`Campo obrigatório ausente: ${field}`);\n  }\n}\n\nreturn $input.all();"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -48,
+        208
+      ],
+      "id": "2b7c3c9b-875b-4872-8364-b17f3f229c0c",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {token-base-1}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    limit: 200,\n    after: $json.after || undefined,\n    properties: [\n      \"hs_object_id\",\n      \"firstname\",\n      \"lastname\",\n      \"phone\",\n      \"mobilephone\",\n      \"qualificacao\",\n      \"origem_\",\n      \"hubspot_owner_id\",\n      \"hubspot_owner_assigneddate\",\n      \"lastmodifieddate\"\n    ],\n    filterGroups: [\n      {\n        filters: [\n          {\n            propertyName: \"hubspot_owner_assigneddate\",\n            operator: \"GTE\",\n            value: String($json.startDateMs)\n          },\n          {\n            propertyName: \"lastmodifieddate\",\n            operator: \"GTE\",\n            value: String($json.lastSuccessMs)\n          },\n          {\n            propertyName: \"lastmodifieddate\",\n            operator: \"LTE\",\n            value: String($json.nowMs)\n          }\n        ]\n      }\n    ]\n  })\n}}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $response.body.paging.next.after }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.paging?.next?.after }}",
+              "limitPagesFetched": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        144,
+        304
+      ],
+      "id": "58d75dd7-6fe1-4608-a48c-3f57c80cfbeb",
+      "name": "Leads base1"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.hubapi.com/crm/v3/objects/contacts/search",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {token-base-2}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{\n  JSON.stringify({\n    limit: 200,\n    after: $json.after || undefined,\n    properties: [\n      \"hs_object_id\",\n      \"firstname\",\n      \"lastname\",\n      \"phone\",\n      \"mobilephone\",\n      \"qualificacao\",\n      \"origem_\",\n      \"hubspot_owner_id\",\n      \"hubspot_owner_assigneddate\",\n      \"lastmodifieddate\"\n    ],\n    filterGroups: [\n      {\n        filters: [\n          {\n            propertyName: \"hubspot_owner_assigneddate\",\n            operator: \"GTE\",\n            value: String($json.startDateMs)\n          },\n          {\n            propertyName: \"lastmodifieddate\",\n            operator: \"GTE\",\n            value: String($json.lastSuccessMs)\n          },\n          {\n            propertyName: \"lastmodifieddate\",\n            operator: \"LTE\",\n            value: String($json.nowMs)\n          }\n        ]\n      }\n    ]\n  })\n}}",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "parameters": {
+                "parameters": [
+                  {
+                    "type": "body",
+                    "name": "after",
+                    "value": "={{ $response.body.paging.next.after }}"
+                  }
+                ]
+              },
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.paging?.next?.after }}",
+              "limitPagesFetched": true
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        144,
+        128
+      ],
+      "id": "bbe92dd0-aadd-458f-b5de-cb7eed73e209",
+      "name": "Leads base2"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        336,
+        208
+      ],
+      "id": "97a6af4a-7e4b-4a9f-8f96-8b68766f96b3",
+      "name": "Merge"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Pegar ultima execucao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar busca": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pegar ultima execucao": {
+      "main": [
+        [
+          {
+            "node": "Preparar busca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tratar leads": {
+      "main": [
+        [
+          {
+            "node": "UPSERT banco",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "UPSERT banco": {
+      "main": [
+        [
+          {
+            "node": "Pega hora da att",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pega hora da att": {
+      "main": [
+        [
+          {
+            "node": "Atualizar execucao",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Leads base1",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Leads base2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Leads base1": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Leads base2": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Tratar leads",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "1f7b291f-37e2-46ad-ae5b-c38c438aa665",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a8276b49aed8608fc28fee1e8567edfcd447267d49ce19b482e4e2a900c5190c"
+  },
+  "nodeGroups": [],
+  "id": "WMDqNXufbN5x3yk1",
+  "tags": []
+}

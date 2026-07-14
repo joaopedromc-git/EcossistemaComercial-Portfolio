@@ -1,0 +1,1 @@
+select * from vendas_dia_atual;
