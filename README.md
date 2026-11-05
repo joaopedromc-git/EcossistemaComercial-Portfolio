@@ -1,6 +1,6 @@
 # Ecossistema Comercial de Automação e BI
 
-Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma operação real, de 25 a 50 pessoas. Uma venda nova passou a aparecer no dashboard e num aviso no computador da equipe **em menos de 5 minutos**; antes, a equipe dependia do KPI do dia anterior ou de abrir o HubSpot para conferir. O sistema sincroniza **30 a 40 mil leads e 500 a 1.000 vendas por mês** e eliminou de **2 a 5 horas semanais** de consultas, exportações e relatórios manuais.
+Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma operação real, de cerca de 30 pessoas. Uma venda nova passou a aparecer no dashboard e num aviso no computador da equipe **em menos de 5 minutos**; antes, a equipe dependia do KPI do dia anterior ou de abrir o HubSpot para conferir. O sistema sincroniza **15 a 25 mil leads e 500 a 600 vendas por mês** e eliminou de **2 a 5 horas semanais** de consultas, exportações e relatórios manuais.
 
 <p align="center">
   <img src="docs/img/topo_dashboard.jpg" width="900" alt="Dashboard do Metabase com KPIs gerais (vendas, arrecadação, leads, conversão e projeção) e o gráfico de vendas e arrecadação por dia, com dados fictícios">
@@ -12,8 +12,8 @@ Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma oper
 |---|---|---|
 | Venda nova visível para a equipe | KPI do dia anterior, ou abrir o HubSpot | **menos de 5 minutos**, no dashboard e num aviso no computador |
 | Consultas, exportações e relatórios | **2 a 5 h por semana**, à mão | automáticos |
-| Quem usa | — | **25 a 50 pessoas**: vendedores, supervisores e gestão, cada um vendo só o que lhe cabe |
-| Volume sincronizado | — | **30 a 40 mil leads** e **500 a 1.000 vendas** por mês |
+| Quem usa | — | **cerca de 30 pessoas**: vendedores, supervisores e gestão, cada um vendo só o que lhe cabe |
+| Volume sincronizado | — | **15 a 25 mil leads** e **500 a 600 vendas** por mês |
 
 ## Como foi construído
 
