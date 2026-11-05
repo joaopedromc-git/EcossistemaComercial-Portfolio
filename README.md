@@ -1,10 +1,27 @@
 # Ecossistema Comercial de Automação e BI
 
-Projeto de portfólio baseado em uma solução desenvolvida para integrar CRM, automações, banco de dados, dashboards, controle de acesso e notificações comerciais.
+Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma operação real, de 25 a 50 pessoas. Uma venda nova passou a aparecer no dashboard e num aviso no computador da equipe **em menos de 5 minutos**; antes, a equipe dependia do KPI do dia anterior ou de abrir o HubSpot para conferir. O sistema sincroniza **30 a 40 mil leads e 500 a 1.000 vendas por mês** e eliminou de **2 a 5 horas semanais** de consultas, exportações e relatórios manuais.
 
-A solução centraliza dados de vendas e leads, automatiza atualizações, calcula indicadores e apresenta diferentes níveis de visualização conforme o perfil do usuário.
+<p align="center">
+  <img src="docs/img/topo_dashboard.jpg" width="900" alt="Dashboard do Metabase com KPIs gerais (vendas, arrecadação, leads, conversão e projeção) e o gráfico de vendas e arrecadação por dia, com dados fictícios">
+  <br>
+  <sub>Visão da gestão no Metabase, com dados fictícios do banco de demonstração.</sub>
+</p>
 
-Este repositório contém uma versão sanitizada do projeto. Nomes, identificadores, credenciais, endereços e dados do ambiente original foram removidos ou substituídos por informações fictícias.
+| | Antes | Depois |
+|---|---|---|
+| Venda nova visível para a equipe | KPI do dia anterior, ou abrir o HubSpot | **menos de 5 minutos**, no dashboard e num aviso no computador |
+| Consultas, exportações e relatórios | **2 a 5 h por semana**, à mão | automáticos |
+| Quem usa | — | **25 a 50 pessoas**: vendedores, supervisores e gestão, cada um vendo só o que lhe cabe |
+| Volume sincronizado | — | **30 a 40 mil leads** e **500 a 1.000 vendas** por mês |
+
+## Como foi construído
+
+Levou de 1 a 2 meses, durante o estágio. Usei o **ChatGPT como assistente de código**: descrevia o que cada parte precisava fazer (endpoints em C#, views e funções SQL, nós e transformações do n8n), pedia o código e colava nos arquivos que criava no VS Code. Não havia agentes nem assistente dentro do editor; a IA entrava conversa a conversa, uma peça por vez.
+
+## Sobre esta versão
+
+Este repositório é uma versão sanitizada do projeto, organizada como portfólio. Nomes, identificadores, credenciais, endereços e dados do ambiente original foram removidos ou substituídos por informações fictícias. Os dashboards aparecem com os dados do banco de demonstração incluído aqui.
 
 ---
 
