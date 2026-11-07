@@ -37,7 +37,6 @@ O pop-up de venda apresenta:
 - equipe;
 - valor;
 - forma de pagamento;
-- status da matrícula;
 - tipo de publicação.
 
 ### Meta atingida

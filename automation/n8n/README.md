@@ -109,7 +109,7 @@ Esse valor é utilizado para limitar a próxima busca.
 
 O workflow monta os filtros de data necessários para consultar:
 
-- registros atribuídos no mês atual;
+- registros atribuídos a partir de 01/06/2026 (o início do mês é calculado, mas não entra no filtro);
 - registros modificados depois da última execução;
 - registros modificados até o início da execução atual.
 
@@ -136,7 +136,7 @@ Entre os tratamentos estão:
 - normalização de identificadores;
 - definição do proprietário;
 - padronização de textos;
-- validação dos registros obrigatórios.
+- conferência dos parâmetros obrigatórios da busca.
 
 ### 5. Inserção ou atualização
 
@@ -182,7 +182,7 @@ flowchart TD
     F[Inserir ou atualizar vendas]
     G{Venda atende aos critérios?}
     H{Já foi notificada?}
-    I[Enviar evento para a API]
+    I[Enviar evento de venda]
     J[Registrar notificação]
     K{Meta foi atingida?}
     L[Enviar evento de meta]
@@ -200,15 +200,17 @@ flowchart TD
     G -->|Sim| H
 
     H -->|Sim| M
-    H -->|Não| I
+    H -->|Não| K
 
-    I --> J
-    J --> K
-
-    K -->|Não| M
     K -->|Sim| L
+    L --> R[Registrar meta]
+    R --> M
 
-    L --> M
+    K -->|Não| I
+    I --> W[Esperar]
+    W --> J
+    J --> M
+
     M --> N
 ```
 
@@ -253,10 +255,13 @@ Depois da atualização, o workflow verifica se a venda atende às condições n
 
 Entre os critérios utilizados estão:
 
-- status válido;
-- venda realizada no dia;
-- equipe habilitada;
-- dados mínimos preenchidos.
+- status Entrada Paga ou Matrícula Ativa;
+- venda com data de hoje, no fuso America/Sao_Paulo;
+- equipe na lista de equipes habilitadas.
+
+Os campos obrigatórios do aviso são conferidos pela API ao receber o evento.
+
+Na versão sanitizada, os nomes de status e de equipes usados nesse filtro não batem com os do banco de demonstração (lá os status têm emoji e as equipes são Atlas, Aurora e Horizonte), então a demonstração não gera avisos.
 
 ### 6. Controle de duplicidade
 
@@ -281,6 +286,8 @@ metas_notificadas
 ```
 
 Ela impede que a mesma meta seja anunciada várias vezes dentro do mesmo período.
+
+Quando a venda bate uma meta, só o aviso de meta é enviado nessa execução.
 
 ### 8. Envio para a API
 
@@ -370,12 +377,7 @@ O fuso horário adotado na lógica demonstrativa é:
 America/Sao_Paulo
 ```
 
-Os tratamentos evitam problemas como:
-
-- considerar uma venda do dia anterior;
-- registrar horários deslocados;
-- repetir registros;
-- deixar registros fora do intervalo incremental.
+O aviso de venda compara a data da venda com o dia atual nesse fuso. As datas, porém, são gravadas em UTC em colunas sem fuso, e o controle do fluxo de leads guarda o horário de Brasília sem fuso. A correção está em "O que eu faria diferente hoje", no README principal.
 
 ---
 
@@ -486,7 +488,6 @@ Os workflows demonstram experiência com:
 - paginação;
 - sincronização incremental;
 - tratamento de datas;
-- controle de fuso horário;
 - transformação de dados com JavaScript;
 - operações no PostgreSQL;
 - prevenção de duplicidades;

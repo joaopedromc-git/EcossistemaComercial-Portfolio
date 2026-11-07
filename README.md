@@ -1,6 +1,6 @@
 # Ecossistema Comercial de Automação e BI
 
-Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma operação real, de cerca de 30 pessoas. Uma venda nova passou a aparecer no dashboard e num aviso no computador da equipe **em menos de 5 minutos**; antes, a equipe dependia do KPI do dia anterior ou de abrir o HubSpot para conferir. O sistema sincroniza **15 a 25 mil leads e 500 a 600 vendas por mês** e eliminou de **2 a 5 horas semanais** de consultas, exportações e relatórios manuais.
+Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma operação real, de cerca de 30 pessoas. Uma venda nova passou a aparecer no dashboard e num aviso no computador da equipe **em menos de 5 minutos**, em horário comercial; antes, a equipe dependia do KPI do dia anterior ou de abrir o HubSpot para conferir. O sistema sincroniza **15 a 25 mil leads e 500 a 600 vendas por mês** e eliminou de **2 a 5 horas semanais** de consultas, exportações e relatórios manuais.
 
 <p align="center">
   <img src="docs/img/topo_dashboard.jpg" width="900" alt="Dashboard do Metabase com KPIs gerais (vendas, arrecadação, leads, conversão e projeção) e o gráfico de vendas e arrecadação por dia, com dados fictícios">
@@ -10,7 +10,7 @@ Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma oper
 
 | | Antes | Depois |
 |---|---|---|
-| Venda nova visível para a equipe | KPI do dia anterior, ou abrir o HubSpot | **menos de 5 minutos**, no dashboard e num aviso no computador |
+| Venda nova visível para a equipe | KPI do dia anterior, ou abrir o HubSpot | **menos de 5 minutos** em horário comercial, no dashboard e num aviso no computador |
 | Consultas, exportações e relatórios | **2 a 5 h por semana**, à mão | automáticos |
 | Quem usa | — | **cerca de 30 pessoas**: vendedores, supervisores e gestão, cada um vendo só o que lhe cabe |
 | Volume sincronizado | — | **15 a 25 mil leads** e **500 a 600 vendas** por mês |
@@ -18,6 +18,17 @@ Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma oper
 ## Como foi construído
 
 Levou de 1 a 2 meses, durante o estágio. Usei o **ChatGPT como assistente de código**: descrevia o que cada parte precisava fazer (endpoints em C#, views e funções SQL, nós e transformações do n8n), pedia o código e colava nos arquivos que criava no VS Code. Não havia agentes nem assistente dentro do editor; a IA entrava conversa a conversa, uma peça por vez.
+
+## O que eu faria diferente hoje
+
+O código está como foi feito na época. Revisando hoje, eu mudaria:
+
+1. **Avisos em fila.** O aplicativo consulta só a última notificação. Duas vendas na mesma execução do n8n (a cada 5 minutos) viram um aviso só. Hoje ele guardaria a hora do último aviso exibido e buscaria tudo o que chegou depois.
+2. **Consultas com parâmetros.** O fluxo de vendas monta o SQL colando os valores do CRM. Um nome com apóstrofo (Sant'Anna) quebra a execução e trava a sincronização até alguém corrigir o cadastro. Hoje usaria parâmetros (`$1`, `$2`) no nó do PostgreSQL, o que também fecha a porta para injeção de SQL.
+3. **Uma definição só de venda válida.** O dashboard conta 11 status; o aviso de venda, 2 status por nome exato; o cálculo de meta, os mesmos 2 por semelhança. Hoje seria uma tabela de status com uma coluna "conta como venda", usada pelos três.
+4. **Datas com fuso.** As datas chegam do CRM em UTC e são gravadas em colunas sem fuso, e o controle do fluxo de leads guarda o horário de Brasília sem fuso. Hoje usaria `timestamptz` e converteria para America/Sao_Paulo só na exibição.
+5. **Vendedor ligado por ID.** As views ligam venda e vendedor pelo ID do CRM, pelo ID interno ou pelo nome, e a meta notificada usa o nome como chave. Hoje a sincronização gravaria o `vendedor_id`.
+6. **Testes automáticos.** Não há verificação automática. Hoje rodaria o schema, o seed e as validações SQL a cada mudança, como faço no [tiktok-shop-ia](https://github.com/joaopedromc-git/tiktok-shop-ia).
 
 ## Sobre esta versão
 
@@ -100,7 +111,7 @@ flowchart LR
 ### Fluxo principal
 
 1. O n8n consulta vendas e leads no CRM.
-2. Os registros são paginados, validados e normalizados.
+2. Os registros são paginados e normalizados.
 3. As informações são inseridas ou atualizadas no PostgreSQL.
 4. Views e funções SQL transformam os dados em indicadores.
 5. O Metabase apresenta os dashboards.
@@ -127,7 +138,7 @@ A documentação detalhada da arquitetura está em:
 | Aplicativo desktop | Windows Forms |
 | Linguagens | C#, SQL e JavaScript |
 | Infraestrutura | Linux, Docker e Nginx |
-| Autenticação | PostgreSQL, `pgcrypto` e sessões ASP.NET |
+| Autenticação | PostgreSQL, `pgcrypto` e cookie de autenticação do ASP.NET |
 
 ---
 
@@ -230,7 +241,6 @@ Os pop-ups apresentam:
 - valor;
 - forma de pagamento;
 - tipo de publicação;
-- status da matrícula;
 - informações da meta, quando aplicável.
 
 [Código e documentação do aplicativo](apps/notificador-desktop/README.md)
@@ -239,7 +249,7 @@ Os pop-ups apresentam:
 
 ## Dashboards
 
-### Visão superior
+### Visão superior (gestão)
 
 A visão superior apresenta os resultados consolidados da operação.
 
@@ -332,13 +342,12 @@ A tabela `sync_control` registra o horário da última sincronização concluíd
 
 O processo considera:
 
-- horário da última execução;
-- horário atual;
+- horário da última execução (no fluxo de vendas, com 5 minutos de margem para não perder alterações);
+- horário de início da execução atual;
+- data de modificação no CRM;
 - paginação;
-- intervalo mensal;
-- data de modificação;
-- tratamento de fuso horário;
-- conclusão da carga antes de atualizar o controle.
+- data de início fixa (01/06/2026);
+- atualização do controle só depois da carga concluída.
 
 Essa estratégia reduz o volume processado e evita cargas completas desnecessárias.
 
@@ -364,33 +373,6 @@ Entre os indicadores presentes no projeto estão:
 - quantidade de vendas por categoria;
 - quantidade de vendas por forma de pagamento;
 - acompanhamento de dias úteis.
-
----
-
-## Destaques técnicos
-
-O projeto demonstra experiência prática com:
-
-- integração de APIs REST;
-- autenticação em APIs;
-- paginação de grandes volumes;
-- sincronização incremental;
-- tratamento de datas e fusos horários;
-- prevenção de registros duplicados;
-- transformação de dados com JavaScript;
-- consultas SQL com CTEs;
-- agregações e filtros condicionais;
-- funções e views no PostgreSQL;
-- autenticação com senha protegida por hash;
-- controle de acesso baseado em perfil;
-- dashboards parametrizados;
-- integração entre ASP.NET e Metabase;
-- APIs em C#;
-- aplicações Windows Forms;
-- notificações em tempo próximo do real;
-- configuração de serviços Linux;
-- Docker e proxy reverso com Nginx;
-- organização de logs e tratamento de falhas.
 
 ---
 
@@ -430,6 +412,7 @@ EcossistemaComercial-Portfolio/
 │
 ├── docs/
 │   ├── architecture/
+│   ├── img/
 │   ├── security/
 │   ├── setup/
 │   └── README.md
@@ -468,7 +451,7 @@ database/postgresql/seeds/02_seed_demo.sql
 database/postgresql/tests/03_validacao_demo.sql
 ```
 
-Nenhum dado do ambiente original está incluído.
+Nenhum dado do ambiente original está incluído. Credenciais e configurações reais também não; alguns serviços externos precisam ser configurados para uma execução completa.
 
 ---
 
@@ -497,18 +480,6 @@ Para uma leitura rápida, a ordem recomendada é:
 - [Infraestrutura](infrastructure/README.md)
 - [Segurança e sanitização](docs/security/README.md)
 - [Configuração demonstrativa](docs/setup/README.md)
-
----
-
-## Ambiente demonstrativo
-
-O repositório apresenta uma versão sanitizada do ecossistema.
-
-Os códigos, workflows, queries, schema, seed e exemplos de configuração foram organizados para demonstrar a implementação técnica.
-
-Credenciais e configurações reais não estão incluídas. Alguns serviços externos precisam ser configurados para uma execução completa.
-
-Os dashboards são apresentados por screenshots gerados com dados fictícios.
 
 ---
 
@@ -548,29 +519,11 @@ A documentação completa está em:
 
 ---
 
-## Objetivo deste repositório
-
-Este projeto foi organizado como portfólio profissional para apresentar experiência com:
-
-- automação de processos;
-- engenharia e tratamento de dados;
-- desenvolvimento em C#;
-- integração de sistemas;
-- banco de dados;
-- business intelligence;
-- controle de acesso;
-- aplicações desktop;
-- infraestrutura.
-
-O material não representa uma cópia do ambiente original e não contém informações operacionais da organização em que a solução foi utilizada.
-
----
-
 ## Autor
 
 **João Pedro Martins da Costa**
 
-Desenvolvimento com foco em automação, integração de sistemas, dados, dashboards e aplicações em C#.
+Dados, automação e IA aplicada. Projeto mais recente: [tiktok-shop-ia](https://github.com/joaopedromc-git/tiktok-shop-ia), agentes de IA que produzem vídeos de afiliado. Perfil: [github.com/joaopedromc-git](https://github.com/joaopedromc-git).
 
 ---
 
