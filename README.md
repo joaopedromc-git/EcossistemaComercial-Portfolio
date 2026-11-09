@@ -13,7 +13,7 @@ Integrei HubSpot, n8n, PostgreSQL e Metabase para a equipe comercial de uma oper
 | Venda nova visível para a equipe | KPI do dia anterior, ou abrir o HubSpot | **menos de 5 minutos** em horário comercial, no dashboard e num aviso no computador |
 | Consultas, exportações e relatórios | **2 a 5 h por semana**, à mão | automáticos |
 | Quem usa | — | **cerca de 30 pessoas**: vendedores, supervisores e gestão, cada um vendo só o que lhe cabe |
-| Volume sincronizado | — | **15 a 25 mil leads** e **500 a 600 vendas** por mês |
+| Volume sincronizado | — | **15 a 25 mil leads** e **500 a 1.000 vendas** por mês |
 
 ## Como foi construído
 
